@@ -1,5 +1,3 @@
-
-
 # EXI is specified in w3.org/TR/exi
 # For decoding and encoding, different decoders are availabe:
 #  1.  https://github.com/FlUxIuS/V2Gdecoder
@@ -30,20 +28,11 @@
 #         makes it very fast.
 #      Contra: Is only a demo, does not provide an interface which could be used for decoding/encoding.
 #      Work in progress: Fork in https://github.com/uhi22/OpenV2Gx, to add a command line interface (and maybe a socket interface).
-#
-#
-#
-#
-#
-#
-#
 
-from helpers import showAsHex, twoCharHex
+from helpers import twoCharHex
 import subprocess
-import sys
 import time
 import json
-import os
 
 # Example data:
 #   (1) From the Ioniq:
@@ -108,12 +97,8 @@ exiHexDemoSupportedApplicationProtocolRequest2="8000ebab9371d34b9b79d189a98989c1
 # Further examples are collected in the DemoExiLog.txt.
 
 # Configuration of the exi converter tool
-if os.name == "nt":
-    # Windows: Path to the EXI decoder/encoder
-    pathToOpenV2GExe = "..\\OpenV2Gx\\Release\\OpenV2G.exe"
-else:
-    # Linux: Path to the EXI decoder/encoder
-    pathToOpenV2GExe = "../OpenV2Gx/Release/OpenV2G.exe";
+# Linux: Path to the EXI decoder/encoder
+pathToOpenV2GExe = "../OpenV2Gx/Release/OpenV2G.exe";
 
 
 # Functions
@@ -183,17 +168,12 @@ def exiDecode(exiHex, prefix="DH"):
     # if the input is a byte array, we convert it into hex string. If it is already a hex string, we take it as it is.
     #print("type is " + str(type(exiHex)))
     if (str(type(exiHex)) == "<class 'bytearray'>"):
-        #print("changing type to hex string")
         exiHex = exiByteArrayToHex(exiHex)
     if (str(type(exiHex)) == "<class 'bytes'>"):
-        #print("changing type to hex string")
         exiHex = exiByteArrayToHex(exiHex)
-    #print("type is " + str(type(exiHex)))
     param1 = prefix + exiHex # DH for decode handshake
-    #print("exiDecode: trying to decode " + exiHex + " with schema " + prefix)
     result = subprocess.run(
         [pathToOpenV2GExe, param1], capture_output=True, text=True)
-    #print("stdout:", result.stdout)
     if (len(result.stderr)>0):
         print("exiDecode ERROR. stderr:" + result.stderr)
     strConverterResult = result.stdout
@@ -210,20 +190,12 @@ def exiEncode(strMessageName):
         strConverterResult = "exiEncode ERROR. stderr:" + result.stderr
         print(strConverterResult)
     else:
-        #print("exiEncode stdout:", result.stdout)
-        # Now we have an encoder result in json form, something like:
-        # {
-        # "info": "",
-        # "error": "",
-        # "result": "8004440400"
-        # }
         try:
             jsondict = json.loads(result.stdout)
             strConverterResult = jsondict["result"]
             strConverterError = jsondict["error"]
             if (len(strConverterError)>0):
                 print("[EXICONNECTOR] exiEncode error " + strConverterError)
-            #print("strConverterResult is " + str(strConverterResult))
         except:
             strConverterResult = "exiEncode failed to convert json to dict."
             print(strConverterResult)
@@ -261,9 +233,8 @@ def testReadExiFromSnifferFile():
         if (myLine[0:9]=="[SNIFFER]"):
             posOfEqualsign = myLine.find("=")
             s = myLine[posOfEqualsign+1:] # The part after the "=" contains the EXI hex data.
-            s = s.replace(" ", "") # Remove blanks
-            s = s.replace("\n", "") # Remove line feeds
-            #print(s)
+            s = s.replace(" ", "")
+            s = s.replace("\n", "")
             testDecoder(s, "DD", "")
 
 def testReadExiFromExiLogFile(strLogFileName):
@@ -274,8 +245,6 @@ def testReadExiFromExiLogFile(strLogFileName):
     except:
         print("Could not open " + strLogFileName)
         isFileOk = False
-        if (strLogFileName == "PevExiLog.txt"):
-            print("This is no problem. The PevExiLog.txt will be created when the pyPLC runs in PevMode, and can be decoded afterwards.")
     if (isFileOk):
         fileOut = open(strLogFileName + '.decoded.txt', 'w')
         # example: "ED 809a02004080c1014181c210b8"
@@ -304,7 +273,6 @@ def testReadExiFromExiLogFile(strLogFileName):
                 s = strToDecode[posOfSpace+1:] # The part after the " " contains the EXI hex data.
                 s = s.replace(" ", "") # Remove blanks
                 s = s.replace("\n", "") # Remove line feeds
-                #print(s)
                 decoded=exiDecode(s, "D"+strDecoderSelection)
                 print(myLine.replace("\n", "") + " means:")
                 print(decoded)
@@ -335,85 +303,6 @@ def testTimeConsumption():
 if __name__ == "__main__":
     nFail=0
     print("Testing exiConnector...")
-    if (False):
-        testTimeConsumption()
-        exit()
-    if (True):        
-        testReadExiFromExiLogFile('DemoExiLog.txt')
-        testReadExiFromExiLogFile('PevExiLog.txt')
-        exit()
-    
-    if (False):
-        testDecoder("8000ebab9371d34b9b79d189a98989c1d191d191818981d26b9b3a232b30010000040001b75726e3a64696e3a37303132313a323031323a4d73674465660020000100880", pre="DH", comment="supportedAppProtocolReq")
-        testDecoder("80400040", pre="DH", comment="supportedAppProtocolRes")
-
-        testDecoder("809a0011d00000", pre="DD", comment="SessionSetupReq")
-        testDecoder("809a02004080c1014181c211e0000080", pre="DD", comment="SessionSetupRes")
-        testDecoder("809a001198", pre="DD", comment="ServiceDiscoveryReq")
-        testDecoder("809a0011a0012002412104", pre="DD", comment="ServiceDiscoveryRes")
-        testDecoder("809a0011b2001280", pre="DD", comment="ServicePaymentSelectionReq")
-        testDecoder("809a0011c000", pre="DD", comment="ServicePaymentSelectionRes")
-        testDecoder("809a00107211400dc0c8c82324701900", pre="DD", comment="ChargeParameterDiscoveryReq")    
-        testDecoder("809a001080004820400000c99002062050193080c0c802064c8010190140c80a20", pre="DD", comment="ChargeParameterDiscoveryRes")
-        testDecoder("809a001010400000", pre="DD", comment="CableCheckReq")
-        testDecoder("809a0010200200000000", pre="DD", comment="CableCheckRes")
-        testDecoder("809a001150400000c80006400000", pre="DD", comment="PreChargeReq")
-        testDecoder("809a00116002000000320000", pre="DD", comment="PreChargeRes")
-    
-    if (False):
-        print("The request from the Ioniq after the EVSE sent ServicePaymentSelectionRes:")
-        testDecoder("809A00113020000A00000000", pre="DD", comment="PowerDeliveryReq")
-    if (False):
-        #print("The session setup request of the Ioniq:")
-        #testDecoder("809A02000000000000000011D01811959401930C00", pre="DD", comment="SessionSetupReq")
-        print("Ioniq with pyPlc")
-        testDecoder("809a02004080c1014181c2107190000005004061a01e04070c84c02050a02000c2438368040309094820105e0a60", pre="DD") # 2022-11-11, 25.315s ChargeParameterDiscoveryReq
-#testDecoder("809a02004080c1014181c21080004820400000c99002062050193080c0c802064c8010190140c80a20", pre="DD") # 2022-11-11, 25.408s ChargeParamDisc Res
-        
-        #testDecoder("809a02004080c1014181c210200200000000", pre="DD") # 2022-11-11, 26.32s CableCheckRes
-        #testDecoder("809a02004080c1014181c2116002000000320000", pre="DD") # 2022-11-11, 27.659s PrechargeRes
-        #print("A ChargeParameterDiscoveryReq")        
-        #testDecoder("809a00107211400dc0c8c82324701900", pre="DD", comment="ChargeParameterDiscoveryReq")
-    if (False):
-        print("From  https://openinverter.org/forum/viewtopic.php?p=54692#p54692")
-        testDecoder("809A0233EBC74AB099A6DC907191400500C8C82324701900", pre="DD") # from https://openinverter.org/forum/viewtopic.php?p=54692#p54692
-
-    if (False):
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 E0 00 00 80", pre="DD", comment="SessionSetupRes")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 94 00", pre="DD", comment="ServiceDiscoveryReq")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 A0 01 20 02 41 00 84", pre="DD", comment="ServiceDiscoveryRes")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 B2 00 12 80", pre="DD", comment="ServicePaymentSelectionReq")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 C0 00", pre="DD", comment="ServicePaymentSelectionRes")
-        print("The error response of the Ioniq with FAILED_ChargingSystemIncompatibility")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 11 30 20 00 0A 00 00 00 00", pre="DD", comment="PowerDeliveryReq")
-        
-        print("The request of the Ioniq after ServicePaymentSelectionResponse")
-        testDecoder("80 9A 02 00 40 80 C1 01 41 81 C2 10 B8", pre="DD", comment="ContractAuthenticationReq")
-    if (False):        
-        print("The response of the Alpi chargeParameterDiscovery")
-        testDecoder("80 9A 02 00 00 00 00 03 1F DC 8B D0 80 02 00 00 00 00 00 10 00 2A 80 04 00 00 14 0C 00 40 80 E1 8A 3A 0A 0A 00 A0 60 60 00 08 0A 01 E2 30 30 06 10", pre="DD", comment="ChargeParameterDiscoveryRes")
-
-
-    if (False):
-        testDecoder("809a00113060", pre="DD", comment="PowerDeliveryReq")
-        testDecoder("809a0011400420400000", pre="DD", comment="PowerDeliveryRes")
-        testDecoder("809a0010d0400000c800410c8000", pre="DD", comment="CurrentDemandReq")
-        testDecoder("809a0010e0020000003200019000000600", pre="DD", comment="CurrentDemandRes")
-        testDecoder("809a001210400000", pre="DD", comment="WeldingDetectionReq")
-        testDecoder("809a00122002000000320000", pre="DD", comment="WeldingDetectionRes")
-        testDecoder("809a0011f0", pre="DD", comment="SessionStopReq")
-        testDecoder("809a00120000", pre="DD", comment="SessionStopRes")
-    
-    print("Number of fails: " + str(nFail))
-    
-
-        
-    #print("Testing exiDecode with exiHexDemoSupportedApplicationProtocolRequestIoniq")
-    #print(exiDecode(exiHexDemoSupportedApplicationProtocolRequestIoniq))
-    #print("Testing exiDecode with exiHexDemoSupportedApplicationProtocolRequest2")
-    #strConverterResult = exiDecode(exiHexDemoSupportedApplicationProtocolRequest2)
-    #print(strConverterResult)
-
-    #strConverterResult = exiDecode(exiHexToByteArray(exiHexDemoSupportedApplicationProtocolRequest2))
-    #print(strConverterResult)
-        
+    testReadExiFromExiLogFile('DemoExiLog.txt')
+    testReadExiFromExiLogFile('PevExiLog.txt')
+    exit()        

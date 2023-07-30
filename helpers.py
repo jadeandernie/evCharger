@@ -1,5 +1,3 @@
-
-
 def twoCharHex(b):
     strHex = "%0.2X" % b
     return strHex

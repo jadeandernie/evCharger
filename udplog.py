@@ -9,7 +9,6 @@ class udplog():
         for i in range(0, 6):
             self.EthTxFrame[6+i] = macbytearray[i]
             
-                          
     def log(self, s, purpose=""):
         # return # activate this line to disable the logging completely
         #
@@ -28,9 +27,9 @@ class udplog():
         if (len(s)>700):
             s = s[0:700] # Limit the length. Too long messages crash the transmit. Todo: Find out the real limit.
         strMessage=s+"\0"
-      
+
         lenPayLoad = 4 + len(strMessage) # length of level is 4
-        
+
         buffer=bytearray(lenPayLoad+28) # prepare the IPv4 buffer. Including 28 bytes IP header.
         # syslog level (4 characters)
         for i in range(0, len(strLevel)):
@@ -76,9 +75,7 @@ class udplog():
         udpchecksum = 0 # checksum 0 has the special meaning: no checksum. Receiver ignores it.
         buffer[26] = udpchecksum >> 8
         buffer[27] = (udpchecksum & 0xff)
-        
-
-            
+ 
         # packs the IP packet into an ethernet packet
         self.EthTxFrame = bytearray(len(buffer) + 6 + 6 + 2) # Ethernet header needs 14 bytes:
                                                       #  6 bytes destination MAC
@@ -97,8 +94,7 @@ class udplog():
         for i in range(0, len(buffer)): # copy the IPv4 buffer content into the Ethernet buffer
             self.EthTxFrame[14+i] = buffer[i]
         self.transmit(self.EthTxFrame) # and finally transmit the Ethernet frame
-
-                        
+             
     def __init__(self, transmitCallback, addressManager):
         self.transmit = transmitCallback
         self.addressManager = addressManager
@@ -113,7 +109,7 @@ class udplog():
 def udplog_init(transmitCallback, addressManager):
     global udplogger
     udplogger = udplog(transmitCallback, addressManager) # create a global logger object
-    
+
 def udplog_log(s, purpose=""):
     global udplogger
     udplogger.log(s, purpose)

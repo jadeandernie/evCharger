@@ -5,17 +5,13 @@
 # https://docs.python.org/3/howto/sockets.html
 # https://realpython.com/python-sockets/
 # https://stackoverflow.com/questions/5308080/python-socket-accept-nonblocking
-#
-
 
 import socket
 import select
 import sys # for argv
 import time # for time.sleep()
 import errno
-import os
-import subprocess
-from configmodule import getConfigValue, getConfigValueBool
+from configmodule import getConfigValue
 
 class pyPlcTcpClientSocket():
     def __init__(self, callbackAddToTrace):
@@ -37,9 +33,7 @@ class pyPlcTcpClientSocket():
             # for connecting, we are still in blocking-mode because
             # otherwise we run into error "[Errno 10035] A non-blocking socket operation could not be completed immediately"
             # We set a shorter timeout, so we do not block too long if the connection is not established:
-            #print("step1")
             self.sock.settimeout(0.5)
-            #print("step2")
 
             # https://stackoverflow.com/questions/71022092/python3-socket-program-udp-ipv6-bind-function-with-link-local-ip-address-gi
             # While on Windows10 just connecting to a remote link-local-address works, under
@@ -48,13 +42,10 @@ class pyPlcTcpClientSocket():
             # host = "2003:d1:170f:d500:2052:326e:cef9:ad07" # works
             # host = "fe80::c690:83f3:fbcb:980e" # invalid argument. Link local address needs an interface specified.
             # host = "fe80::c690:83f3:fbcb:980e%eth0" # ok with socket.getaddrinfo
-            if (os.name != 'nt'):
-                # We are at the Raspberry
-                #print(host[0:5].lower())
-                if (host[0:5].lower()=="fe80:"):
-                    #print("This is a link local address. We need to add %eth0 at the end.")
-                    ethInterface = getConfigValue("eth_interface") # e.g. "eth0"
-                    host = host + "%" + ethInterface
+            #print(host[0:5].lower())
+            if (host[0:5].lower()=="fe80:"):
+                ethInterface = getConfigValue("eth_interface") # e.g. "eth0"
+                host = host + "%" + ethInterface
             socket_addr = socket.getaddrinfo(host,port,socket.AF_INET6,socket.SOCK_DGRAM,socket.SOL_UDP)[0][4]
             
             #print(socket_addr)
@@ -65,7 +56,6 @@ class pyPlcTcpClientSocket():
             # of link-local ip-address.
             #self.sock.connect((host, port, 0, 0))
             self.sock.connect(socket_addr)
-            #print("step3")
             self.sock.setblocking(0) # make this socket non-blocking, so that the recv function will immediately return
             self.isConnected = True
         except socket.error as e:
@@ -109,7 +99,7 @@ class pyPlcTcpClientSocket():
             except:
                 self.isConnected = False
                 return -1
-        return 0 # success
+        return
         
     def isRxDataAvailable(self):
         # check for availability of data, and get the data from the socket into local buffer.
@@ -122,12 +112,10 @@ class pyPlcTcpClientSocket():
             err = e.args[0]
             if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
                 # this is the normal case, if no data is available
-                # print('No data available')
+                print('No data available')
                 pass
             else:
-                # a "real" error occurred
-                # print("real error")
-                # print(e)
+                print(e)
                 self.isConnected = False
         else:
             if len(msg) == 0:
@@ -179,11 +167,10 @@ class pyPlcTcpServerSocket():
             self.addToTrace(IPv6Addr)
         self.read_list = [self.ourSocket]
         self.rxData = []
-        
+
     def resetTheConnection(self):
         # in case of a broken connection, here we try to start it again
         self.addToTrace("Trying to reset the TCP socket")
-        # Todo: how to "reset" the socket?
         try:
             self.ourSocket.close()
         except:
@@ -195,9 +182,7 @@ class pyPlcTcpServerSocket():
         self.callbackStateNotification(1) # inform the higher level state machines, that TCP is listening
         self.addToTrace("pyPlcTcpSocket listening on port " + str(self.tcpPort))
         hostname=socket.gethostname()
-        IPAddr=socket.gethostbyname(hostname)
         addressInfo = socket.getaddrinfo(hostname, None, socket.AF_INET6)
-        #print("Your Computer Name is:"+hostname)
         self.addToTrace("The socket is linked the following IP addresses:")
         for i in range(0, len(addressInfo)):
             #fe80::4c46:fea5:b6c9:25a9
@@ -205,23 +190,23 @@ class pyPlcTcpServerSocket():
             self.addToTrace(IPv6Addr)
         self.read_list = [self.ourSocket]
         self.rxData = []
-        
+
     def addToTrace(self, s):
         self.callbackAddToTrace(s)
 
     def isRxDataAvailable(self):
         return (len(self.rxData)>0)
-        
+
     def getRxData(self):
         # provides the received data, and clears the receive buffer
         d = self.rxData
         self.rxData = []
         return d
-        
+
     def transmit(self, txMessage):
         numberOfSockets = len(self.read_list)
         if (numberOfSockets<2):
-            # print("we have " + str(numberOfSockets) + ", we should have 2, one for accepting and one for data transfer. Will not transmit.")
+            print("we have " + str(numberOfSockets) + ", we should have 2, one for accepting and one for data transfer. Will not transmit.")
             return -1
         # Simplification: We will send to the FIRST open connection, even we would have more connections open. This is
         # ok, because in our use case we have exactly one client.
@@ -235,8 +220,8 @@ class pyPlcTcpServerSocket():
                 self.addToTrace("socket connection broken")
                 return -1
             totalsent = totalsent + sent
-        return 0 # success
-        
+        return
+
     def mainfunction(self):
         # The select() function will block until one of the socket states has changed.
         # We specify a timeout, to be able to run it in the main loop.
@@ -272,9 +257,6 @@ class pyPlcTcpServerSocket():
                     except:
                         pass
 
-
-
-
 def testServerSocket():
     print("Testing the pyPlcTcpServerSocket...")
     s = pyPlcTcpServerSocket()
@@ -295,7 +277,6 @@ def testServerSocket():
             print("trying to send something else")
             msg = "ok, something else..."
             s.transmit(bytes(msg, "utf-8"))
-            
 
 def testClientSocket():
     print("Testing the pyPlcTcpClientSocket...")
@@ -316,18 +297,13 @@ def testClientSocket():
                 print("received " + str(d))
             if ((i % 3)==0):
                 print("sending something to the server")
-                c.transmit(bytes("Test", "utf-8"))
-            
-    print("end")
+                c.transmit(bytes("Test", "utf-8")) 
 
 def testExtra():
     print("testExtra")
-    #findLinkLocalIpv6Address()
-    
 
 if __name__ == "__main__":
     print("Testing pyPlcTcpSocket.py....")
-    
     if (len(sys.argv) == 1):
         print("Use command line argument c for clientSocket or s for serverSocket")
         exit()
@@ -336,7 +312,6 @@ if __name__ == "__main__":
         exit()
     if (sys.argv[1] == "s"):
         testServerSocket()
-        exit()
     if (sys.argv[1] == "x"):
         testExtra()
         exit()

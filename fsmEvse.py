@@ -1,15 +1,9 @@
-# State machine for the charger
-#
-#
-
-#------------------------------------------------------------
-
 import pyPlcTcpSocket
-import time # for time.sleep()
+import time
 from helpers import prettyHexMessage, combineValueAndMultiplier
 from mytestsuite import *
 from random import random
-from exiConnector import * # for EXI data handling/converting
+from exiConnector import *
 
 stateWaitForSupportedApplicationProtocolRequest = 0
 stateWaitForSessionSetupRequest = 1
@@ -23,7 +17,7 @@ stateWaitForPowerDeliveryRequest = 8
 
 class fsmEvse():
     def addToTrace(self, s):
-        self.callbackAddToTrace("[EVSE] " + s)
+        self.callbackAddToTrace(s)
 
     def publishStatus(self, s):
         self.callbackShowStatus(s, "evseState")
@@ -295,9 +289,6 @@ class fsmEvse():
                 self.publishStatus("SessionStop")
                 self.Tcp.transmit(msg)
                 self.enterState(stateWaitForFlexibleRequest) # todo: not clear, what is specified in DIN
-
-
-
         if (self.isTooLong()):
             self.enterState(0)
 
@@ -378,16 +369,13 @@ class fsmEvse():
         self.Tcp.mainfunction() # call the lower-level worker
         if (self.Tcp.isRxDataAvailable()):
                 self.rxData = self.Tcp.getRxData()
-                #self.addToTrace("received " + str(self.rxData))
         # run the state machine:
         self.cyclesInState += 1 # for timeout handling, count how long we are in a state
         self.stateFunctions[self.state](self)
 
 
 if __name__ == "__main__":
-    print("Testing the evse state machine")
     evse = fsmEvse()
-    print("Press Ctrl-Break for aborting")
     while (True):
         time.sleep(0.1)
         evse.mainfunction()

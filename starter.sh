@@ -54,7 +54,7 @@ pwd
 mkdir -p log
 # prepare the file names for the log files
 date=$(date "+%Y-%m-%d_%H%M%S")
-logfile=./log/"$date"_pevNoGui.log
+logfile=./log/"$date"_evseNoGui.log
 tcpdump_logfile=./log/"$date"_tcpdump.pcap
 
 echo "logfile: $logfile"
@@ -69,7 +69,7 @@ ip addr >> "$logfile"
 pwd >> "$logfile"
 
 # call the pyPlc python script
-PYTHONUNBUFFERED=1 /usr/bin/python3 pevNoGui.py | tee -a "$logfile"
+PYTHONUNBUFFERED=1 /usr/bin/python3 evseNoGui.py | tee -a "$logfile"
 pwd >> "$logfile"
 date >> "$logfile"
 

@@ -1,4 +1,3 @@
-
 # Calculation for UDP checksum
 #
 # This module calculates the UDP checksum in case of IPv6 usage.
@@ -15,8 +14,6 @@ testethernetframe = [
 , 0x65 , 0xff , 0xfe , 0x00 , 0x64 , 0xc3 , 0xff , 0x02 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00
 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x01 , 0xcc , 0xaf , 0x3b , 0x0e , 0x00 , 0x12 , 0x89 , 0x5e , 0x01 , 0xfe
 , 0x90 , 0x00 , 0x00 , 0x00 , 0x00 , 0x02 , 0x10 , 0x00 ]
-
-
 
 def calculateUdpChecksumForIPv6(udpframe, ipv6source, ipv6dest):
     # Parameters:
@@ -66,14 +63,13 @@ def calculateUdpChecksumForIPv6(udpframe, ipv6source, ipv6dest):
     checksum = totalSum ^ 0xffff
     return checksum
 
-
 if __name__ == "__main__":
     print("Testing the udp checksum calculation...")
     showAsHex(testethernetframe, "testethernetframe ")
     ipv6frame = bytearray(len(testethernetframe)-6-6-2) # without the ethernet header (MAC, MAC, ethertype)
     for i in range(0, len(ipv6frame)):
         ipv6frame[i] = testethernetframe[14+i]
-        
+
     showAsHex(ipv6frame, "ipv6frame ")    
     # checksum calculation see https://en.wikipedia.org/wiki/User_Datagram_Protocol
 
@@ -156,7 +152,7 @@ if __name__ == "__main__":
     myUdpFrame = bytearray(udplen) # payload size is the announced udp size
     for i in range(0, len(myUdpFrame)):
         myUdpFrame[i] = ipv6frame[40+i]
-        
+
     myIpv6Source = bytearray(16)
     myIpv6Dest = bytearray(16)
     for i in range(0, 16):

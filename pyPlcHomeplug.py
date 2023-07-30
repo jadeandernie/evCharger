@@ -32,18 +32,13 @@
 # 8. The tpLink has software from 2017, maybe the SLAC was removed at this version.
 # 9. Article regarding firmware- and configuration update: https://fitzcarraldoblog.wordpress.com/2020/07/22/updating-the-powerline-adapters-in-my-home-network/
 
-
 import pcap
 import pyPlcIpv6
 import udplog
-import time
-import os
-from helpers import * # prettyMac etc
-from pyPlcModes import *
+from helpers import *
 from mytestsuite import *
 from random import random
-from configmodule import getConfigValue, getConfigValueBool
-import sys
+from configmodule import getConfigValue
 
 MAC_BROADCAST = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]
 
@@ -125,23 +120,22 @@ class pyPlcHomeplug():
         if len(messagebufferbytearray)>(6+6+2):
             etherType=messagebufferbytearray[12]*256 + messagebufferbytearray[13]
         return etherType
-        
-        
+
     def fillSourceMac(self, mac, offset=6): # at offset 6 in the ethernet frame, we have the source MAC
         # we can give a different offset, to re-use the MAC also in the data area
         for i in range(0, 6):
             self.mytransmitbuffer[offset+i]=mac[i]
-        
+
     def fillDestinationMac(self, mac, offset=0): # at offset 0 in the ethernet frame, we have the destination MAC
          # we can give a different offset, to re-use the MAC also in the data area
         for i in range(0, 6):
             self.mytransmitbuffer[offset+i]=mac[i]
-            
+
     def fillRunId(self, offset):
         # at the given offset in the transmit buffer, fill the 8-bytes-RunId.
         for i in range(0, 8):
             self.mytransmitbuffer[offset+i]=self.pevRunId[i]
-        
+  
     def cleanTransmitBuffer(self): # fill the complete ethernet transmit buffer with 0x00
         for i in range(0, len(self.mytransmitbuffer)):
             self.mytransmitbuffer[i]=0
@@ -149,19 +143,14 @@ class pyPlcHomeplug():
     def setNmkAt(self, index):
         # sets the Network Membership Key (NMK) at a certain position in the transmit buffer
         for i in range(0, 16):
-            if (self.iAmEvse):
-                # In EvseMode, the NMK is freely chosen:
-                self.mytransmitbuffer[index+i]=self.NMK_EVSE_random[i] # NMK 
-            else:
-                # In PevMode, the NMK is the one which was received in the SlacMatchConf. Or a default, if we did not receive any.
-                self.mytransmitbuffer[index+i]=self.NMK[i] # NMK
+            self.mytransmitbuffer[index+i]=self.NMK_EVSE_random[i] # NMK 
 
     def setNidAt(self, index):
         # (b0f2e695666b03 was NID of TPlink)
         # copies the network ID (NID, 7 bytes) into the wished position in the transmit buffer
         for i in range(0, 7):
             self.mytransmitbuffer[index+i]=self.NID[i]
-        
+
     def getManagementMessageType(self):
         # calculates the MMTYPE (base value + lower two bits), see Table 11-2 of homeplug spec
         return (self.myreceivebuffer[16]<<8) + self.myreceivebuffer[15]
@@ -213,7 +202,6 @@ class pyPlcHomeplug():
         self.mytransmitbuffer[17]=0x00 # Vendor OUI
         self.mytransmitbuffer[18]=0xB0 # 
         self.mytransmitbuffer[19]=0x52 # 
-        
 
     def composeSetKey(self, variation=0):
 		# CM_SET_KEY.REQ request
@@ -221,13 +209,8 @@ class pyPlcHomeplug():
         # Table 11-88 in the homeplug_av21_specification_final_public.pdf
         self.mytransmitbuffer = bytearray(60)
         self.cleanTransmitBuffer()
-        # Destination MAC
-        #self.fillDestinationMac(MAC_DEVOLO_26)
-        #self.fillDestinationMac(MAC_TPLINK_E4)
         self.fillDestinationMac(MAC_BROADCAST)
-        # Source MAC
         self.fillSourceMac(self.myMAC)
-        # Protocol
         self.mytransmitbuffer[12]=0x88 # Protocol HomeplugAV
         self.mytransmitbuffer[13]=0xE1
         self.mytransmitbuffer[14]=0x01 # version
@@ -318,7 +301,7 @@ class pyPlcHomeplug():
         self.mytransmitbuffer[20]=0x00 #
         self.fillRunId(21) # 21 to 28: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00. Tesla uses "TESLA EV".
         # rest is 00
-        
+
     def composeSlacParamCnf(self):
         self.mytransmitbuffer = bytearray(60)
         self.cleanTransmitBuffer()
@@ -348,7 +331,7 @@ class pyPlcHomeplug():
         self.mytransmitbuffer[35]=0x00 # 
         self.fillRunId(36)  # 36 to 43 runid 8 bytes 
         # rest is 00
-    
+
     def composeStartAttenCharInd(self):
         # reference: see wireshark interpreted frame from ioniq
         self.mytransmitbuffer = bytearray(60)
@@ -401,7 +384,7 @@ class pyPlcHomeplug():
         # 55 to 70: random number. All 0xff in the ioniq message.
         for i in range(55, 71):
             self.mytransmitbuffer[i]=0xFF
-        
+
     def composeAttenCharInd(self):
         self.mytransmitbuffer = bytearray(129)
         self.cleanTransmitBuffer()
@@ -434,7 +417,7 @@ class pyPlcHomeplug():
         self.mytransmitbuffer[126]=0x0f
         self.mytransmitbuffer[127]=0x13
         self.mytransmitbuffer[128]=0x19
-        
+
     def composeAttenCharRsp(self):
         # reference: see wireshark interpreted frame from Ioniq
         self.mytransmitbuffer = bytearray(70)
@@ -458,7 +441,7 @@ class pyPlcHomeplug():
         # 35 to 51: source_id, all 00
         # 52 to 68: resp_id, all 00
         # 69: result. 0 is ok
-        
+
     def composeSlacMatchReq(self):
         # reference: see wireshark interpreted frame from Ioniq
         self.mytransmitbuffer = bytearray(85)
@@ -485,7 +468,7 @@ class pyPlcHomeplug():
         self.fillDestinationMac(self.evseMac, 63) # 63 to 68: EVSE MAC
         self.fillRunId(69) # 69 to 76: runid
         # 77 to 84: reserved, all 00        
-    
+
     def composeSlacMatchCnf(self):
         self.mytransmitbuffer = bytearray(109)
         self.cleanTransmitBuffer()
@@ -514,8 +497,6 @@ class pyPlcHomeplug():
         self.setNidAt(85) # 85-91 NID. We can nearly freely choose this, but the upper two bits need to be zero
                                        # 92 reserved 0                                 
         self.setNmkAt(93) # 93 to 108 NMK. We can freely choose this. Normally we should use a random number. 
-        
-
 
     def sendTestFrame(self, selection): 
         if (selection=="1"):
@@ -546,10 +527,10 @@ class pyPlcHomeplug():
             self.composeGetSwWithRamdomMac()
             self.addToTrace("transmitting GetSwWithRamdomMac")           
             self.transmit(self.mytransmitbuffer)
-            
+
     def transmit(self, pkt):
         self.sniffer.sendpacket(bytes(pkt))
-      
+
     def evaluateGetKeyCnf(self):
         self.addToTrace("received GET_KEY.CNF")
         self.numberOfFoundModems += 1
@@ -597,8 +578,7 @@ class pyPlcHomeplug():
         for i in range(0, 7): # NID has 7 bytes
             self.NID[i] = self.myreceivebuffer[29+i]
             s=s+hex(self.NID[i])+ " "
-        self.addToTrace("From GetKeyCnf, got network ID (NID) " + s)
-        
+        self.addToTrace("From GetKeyCnf, got network ID (NID) " + s)      
 
     def evaluateSetKeyCnf(self):
         # The Setkey confirmation
@@ -635,112 +615,52 @@ class pyPlcHomeplug():
     def evaluateSlacParamReq(self):
         # We received a SLAC_PARAM request from the PEV. This is the initiation of a SLAC procedure.
         # We extract the pev MAC from it.
-        if (self.iAmEvse==1):
-            self.addToTrace("received SLAC_PARAM.REQ")
-            for i in range(0, 6):
-                self.pevMac[i] = self.myreceivebuffer[6+i]
-            self.addressManager.setPevMac(self.pevMac)
-            self.showStatus(prettyMac(self.pevMac), "pevmac")
-            # extract the RunId from the SlacParamReq, and store it for later use
-            for i in range(0, 8):
-                self.pevRunId[i] = self.myreceivebuffer[21+i]
-            # We are EVSE, we want to answer.
-            self.showStatus("SLAC started", "evseState")
-            self.composeSlacParamCnf()
-            self.addToTrace("[EVSE] transmitting CM_SLAC_PARAM.CNF")
-            self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
+        self.addToTrace("received SLAC_PARAM.REQ")
+        for i in range(0, 6):
+            self.pevMac[i] = self.myreceivebuffer[6+i]
+        self.addressManager.setPevMac(self.pevMac)
+        self.showStatus(prettyMac(self.pevMac), "pevmac")
+        # extract the RunId from the SlacParamReq, and store it for later use
+        for i in range(0, 8):
+            self.pevRunId[i] = self.myreceivebuffer[21+i]
+        self.showStatus("SLAC started", "evseState")
+        self.composeSlacParamCnf()
+        self.addToTrace("[EVSE] transmitting CM_SLAC_PARAM.CNF")
+        self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
     
     def evaluateSlacParamCnf(self):
         # As PEV, we receive the first response from the charger.
         self.addToTrace("Checkpoint102: received SLAC_PARAM.CNF")
-        if (self.iAmPev==1):
-            if (self.pevSequenceState==STATE_WAITING_FOR_SLAC_PARAM_CNF): # we were waiting for the SlacParamCnf
-                self.pevSequenceDelayCycles = 4 # original Ioniq is waiting 200ms
-                self.enterState(STATE_SLAC_PARAM_CNF_RECEIVED) # enter next state. Will be handled in the cyclic runPevSequencer
-            
+                    
     def evaluateMnbcSoundInd(self):
         # We received MNBC_SOUND.IND from the PEV. Normally this happens 10times, with a countdown (remaining number of sounds)
         # running from 9 to 0. If the countdown is 0, this is the last message. In case we are the EVSE, we need
         # to answer with a ATTEN_CHAR.IND, which normally contains the attenuation for 10 sounds, 58 groups.
         self.addToTrace("received MNBC_SOUND.IND")
-        if (self.iAmEvse==1):
-            self.showStatus("SLAC 2", "evseState")
-            countdown = self.myreceivebuffer[38]
-            if (countdown == 0):
-                self.composeAttenCharInd()
-                self.addToTrace("[EVSE] transmitting ATTEN_CHAR.IND")
-                self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
+        self.showStatus("SLAC 2", "evseState")
+        countdown = self.myreceivebuffer[38]
+        if (countdown == 0):
+            self.composeAttenCharInd()
+            self.addToTrace("[EVSE] transmitting ATTEN_CHAR.IND")
+            self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
                 
     def evaluateAttenCharInd(self):
         self.addToTrace("received ATTEN_CHAR.IND")    
-        if (self.iAmPev==1):
-            self.addToTrace("[PEVSLAC] received AttenCharInd in state " + str(self.pevSequenceState))
-            if (self.pevSequenceState==STATE_WAIT_FOR_ATTEN_CHAR_IND): # we were waiting for the AttenCharInd
-                # todo: Handle the case when we receive multiple responses from different chargers.
-                #       Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
-                # Take the MAC of the charger from the frame, and store it for later use.
-                for i in range(0, 6):
-                    self.evseMac[i] = self.myreceivebuffer[6+i] # source MAC starts at offset 6
-                self.addressManager.setEvseMac(self.evseMac)
-                self.AttenCharIndNumberOfSounds = self.myreceivebuffer[69]
-                self.addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): " + str(self.AttenCharIndNumberOfSounds)) 
-                self.composeAttenCharRsp()
-                self.addToTrace("[PEVSLAC] transmitting ATTEN_CHAR.RSP...")
-                self.transmit(self.mytransmitbuffer)                 
-                self.pevSequenceState=STATE_ATTEN_CHAR_IND_RECEIVED # enter next state. Will be handled in the cyclic runPevSequencer
-            
-            
+
     def evaluateSlacMatchReq(self):
         # We received SLAC_MATCH.REQ from the PEV.
-        # If we are EVSE, we send the response.
         self.addToTrace("received SLAC_MATCH.REQ")
-        if (self.iAmEvse==1):
-            self.showStatus("SLAC match", "evseState")
-            self.composeSlacMatchCnf()
-            self.addToTrace("[EVSE] transmitting SLAC_MATCH.CNF")
-            self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
-        
-  
-    def evaluateSlacMatchCnf(self):
-        # The SLAC_MATCH.CNF contains the NMK and the NID.
-        # We extract this information, so that we can use it for the CM_SET_KEY afterwards.
-        # References: https://github.com/qca/open-plc-utils/blob/master/slac/evse_cm_slac_match.c
-        # 2021-12-16_HPC_säule1_full_slac.pcapng
-        if (self.iAmEvse==1):
-            # If we are EVSE, nothing to do. We have sent the match.CNF by our own.
-            # The SET_KEY was already done at startup.
-            pass
-        else:
-            self.addToTrace("received SLAC_MATCH.CNF")
-            s = ""
-            for i in range(0, 7): # NID has 7 bytes
-                self.NID[i] = self.myreceivebuffer[85+i]
-                s=s+hex(self.NID[i])+ " "
-            self.addToTrace("From SlacMatchCnf, got network ID (NID) " + s)        
-            s = ""
-            for i in range(0, 16):
-                self.NMK[i] = self.myreceivebuffer[93+i]
-                s=s+hex(self.NMK[i])+ " "
-            self.addToTrace("From SlacMatchCnf, got network membership key (NMK) " + s) 
-            # use the extracted NMK and NID to set the key in the adaptor:
-            self.composeSetKey(0)
-            self.addToTrace("Checkpoint170: transmitting CM_SET_KEY.REQ")
-            self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
-            if (self.pevSequenceState==STATE_WAITING_FOR_SLAC_MATCH_CNF): # we were waiting for finishing the SLAC_MATCH.CNF and SET_KEY.REQ
-                if (self.isSimulationMode!=0):
-                    # In simulation mode, we pretend a successful SetKey response:
-                    self.connMgr.SlacOk()
-                self.enterState(STATE_WAITING_FOR_RESTART2)
-    
+        self.showStatus("SLAC match", "evseState")
+        self.composeSlacMatchCnf()
+        self.addToTrace("[EVSE] transmitting SLAC_MATCH.CNF")
+        self.sniffer.sendpacket(bytes(self.mytransmitbuffer))
+
     def evaluateReceivedHomeplugPacket(self):
         mmt = self.getManagementMessageType()
-        # print(hex(mmt))
         if (mmt == CM_GET_KEY + MMTYPE_CNF):
             self.evaluateGetKeyCnf()
         if (mmt == CM_SLAC_MATCH + MMTYPE_REQ):
             self.evaluateSlacMatchReq()
-        if (mmt == CM_SLAC_MATCH + MMTYPE_CNF):
-            self.evaluateSlacMatchCnf()
         if (mmt == CM_SLAC_PARAM + MMTYPE_REQ):
             self.evaluateSlacParamReq()
         if (mmt == CM_SLAC_PARAM + MMTYPE_CNF):
@@ -757,42 +677,33 @@ class pyPlcHomeplug():
     def isEvseModemFound(self):
         #return 0 # todo: look whether the MAC of the EVSE modem is in the list of detected modems
         return self.numberOfFoundModems>1
-        
+
     def enterState(self, n):
         self.addToTrace("[PEVSLAC] from " + str(self.pevSequenceState) + " entering " + str(n))
         self.pevSequenceState = n
         self.pevSequenceCyclesInState = 0
-        
+
     def isTooLong(self):
-        # The timeout handling function.
         return (self.pevSequenceCyclesInState > 500)
 
     def runEvseSlacHandler(self):
-        if (self.evseSlacHandlerState==0):
-            # we did not yet configure our EVSE modem with the random key. Do it now.
-            # Fill some of the bytes of the NMK with random numbers. The others stay at 0x77 for easy visibility.
-            self.NMK_EVSE_random[2] = int(random()*255)
-            self.NMK_EVSE_random[3] = int(random()*255)
-            self.composeSetKey(0)
-            self.addToTrace("transmitting SET_KEY.REQ, to configure the EVSE modem with random NMK")
-            self.transmit(self.mytransmitbuffer)
-            self.evseSlacHandlerState = 1 # setkey was done
+        if (self.evseSlacHandlerState!=0):
             return
+        # we did not yet configure our EVSE modem with the random key. Do it now.
+        # Fill some of the bytes of the NMK with random numbers. The others stay at 0x77 for easy visibility.
+        self.NMK_EVSE_random[2] = int(random()*255)
+        self.NMK_EVSE_random[3] = int(random()*255)
+        self.composeSetKey(0)
+        self.addToTrace("transmitting SET_KEY.REQ, to configure the EVSE modem with random NMK")
+        self.transmit(self.mytransmitbuffer)
+        self.evseSlacHandlerState = 1
+        return
 
     def publishStatus(self, s1, s2="", s3=""):
         self.showStatus(s1+s2+s3, "pevState")
-        
+
     def modemFinder_Mainfunction(self):
         if ((self.connMgr.getConnectionLevel()==5) and (self.mofi_state==0)):
-            # We want the modem search only, if no connection is present at all.
-            if (self.isSimulationMode!=0):
-                self.addToTrace("[ModemFinder] We are in SimulationMode. Pretending that one modem is present.")
-                self.composeGetSwReq() # Send a GetSoftwareVersionRequest never the less. Just to have it in the trace.
-                self.transmit(self.mytransmitbuffer)
-                self.numberOfSoftwareVersionResponses = 1 # One pretended modem
-                self.connMgr.ModemFinderOk(self.numberOfSoftwareVersionResponses) # report "success" to the connection manager
-                self.mofi_state=2
-                return
             self.addToTrace("[ModemFinder] Starting modem search")
             self.publishStatus("Modem search")
             self.composeGetSwReq()
@@ -821,259 +732,16 @@ class pyPlcHomeplug():
                 return
             self.mofi_state=0 # back to idle state
 
-    def runPevSequencer(self):
-        # in PevMode, check whether homeplug modem is connected, run the SLAC and SDP
-        self.pevSequenceCyclesInState+=1
-        if (self.connMgr.getConnectionLevel()<10):
-            # we have no modem seen. --> nothing to do for the SLAC
-            if (self.pevSequenceState!=STATE_INITIAL):
-                self.enterState(STATE_INITIAL)
-            return
-        if (self.connMgr.getConnectionLevel()>=20):
-            # we have two modems in the AVLN. This means, the modem pairing is already done. --> nothing to do for the SLAC
-            if (self.pevSequenceState!=STATE_INITIAL):
-                self.enterState(STATE_INITIAL)
-            return
-        if (self.pevSequenceState==STATE_INITIAL): # Initial state.
-            # In real life we would check whether we see 5% PWM on the pilot line. We skip this check.
-            self.isSDPDone = 0
-            self.isDeveloperLocalKey = 0
-            self.nEvseModemMissingCounter = 0
-            self.enterState(STATE_READY_FOR_SLAC)
-            return
-        if (self.pevSequenceState==STATE_READY_FOR_SLAC):
-            if (self.isSimulationMode!=0):
-                self.showStatus("Simu SLAC", "pevState")
-            else:
-                self.showStatus("Starting SLAC", "pevState")
-            self.addToTrace("[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...")
-            self.composeSlacParamReq()
-            self.transmit(self.mytransmitbuffer)                
-            self.enterState(STATE_WAITING_FOR_SLAC_PARAM_CNF)
-            return
-        if (self.pevSequenceState==STATE_WAITING_FOR_SLAC_PARAM_CNF): # Waiting for slac_param confirmation.
-            if (self.pevSequenceCyclesInState>=30):
-                # No response for 1s, this is an error.
-                self.addToTrace("[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF")
-                self.enterState(STATE_INITIAL)
-            # (the normal state transition is done in the reception handler)
-            return
-        if (self.pevSequenceState==STATE_SLAC_PARAM_CNF_RECEIVED): # slac_param confirmation was received.
-            self.pevSequenceDelayCycles = 1 # 1*30=30ms as preparation for the next state.
-                                            # Between the SLAC_PARAM.CNF and the first START_ATTEN_CHAR.IND the Ioniq waits 100ms.
-                                            # The allowed time TP_match_sequence is 0 to 100ms.
-                                            # Alpitronic and ABB chargers are more tolerant, they worked with a delay of approx
-                                            # 250ms. In contrast, Supercharger and Compleo do not respond anymore if we
-                                            # wait so long.
-            self.nRemainingStartAttenChar = 3 # There shall be 3 START_ATTEN_CHAR messages.
-            self.enterState(STATE_BEFORE_START_ATTEN_CHAR)
-            return
-        if (self.pevSequenceState==STATE_BEFORE_START_ATTEN_CHAR): # received SLAC_PARAM.CNF. Multiple transmissions of START_ATTEN_CHAR.                
-            if (self.pevSequenceDelayCycles>0):
-                self.pevSequenceDelayCycles-=1
-                return
-            # The delay time is over. Let's transmit.
-            if (self.nRemainingStartAttenChar>0):
-                self.nRemainingStartAttenChar-=1
-                self.composeStartAttenCharInd()
-                self.addToTrace("[PEVSLAC] transmitting START_ATTEN_CHAR.IND...")
-                self.transmit(self.mytransmitbuffer)        
-                self.pevSequenceDelayCycles = 0 # original from ioniq is 20ms between the START_ATTEN_CHAR. Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-                return
-            else:
-                # all three START_ATTEN_CHAR.IND are finished. Now we send 10 MNBC_SOUND.IND
-                self.pevSequenceDelayCycles = 0 # original from ioniq is 40ms after the last START_ATTEN_CHAR.IND.
-                                                # Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-                self.remainingNumberOfSounds = 10 # We shall transmit 10 sound messages.
-                self.enterState(STATE_SOUNDING)
-            return
-        if (self.pevSequenceState==STATE_SOUNDING): # Multiple transmissions of MNBC_SOUND.IND.                
-            if (self.pevSequenceDelayCycles>0):
-                self.pevSequenceDelayCycles-=1
-                return
-            if (self.remainingNumberOfSounds>0):
-                self.remainingNumberOfSounds-=1
-                self.composeNmbcSoundInd()
-                self.addToTrace("[PEVSLAC] transmitting MNBC_SOUND.IND...") # original from ioniq is 40ms after the last START_ATTEN_CHAR.IND
-                self.transmit(self.mytransmitbuffer)
-                if (self.remainingNumberOfSounds==0):
-                    self.enterState(STATE_WAIT_FOR_ATTEN_CHAR_IND) # move fast to the next state, so that a fast response is catched in the correct state
-                self.pevSequenceDelayCycles = 0 # original from ioniq is 20ms between the messages.
-                                                # Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-            return
-        if (self.pevSequenceState==STATE_WAIT_FOR_ATTEN_CHAR_IND):  # waiting for ATTEN_CHAR.IND
-            # todo: it is possible that we receive this message from multiple chargers. We need
-            # to select the charger with the loudest reported signals.
-            if (self.isTooLong()):
-                self.enterState(STATE_INITIAL)
-            return
-            #(the normal state transition is done in the reception handler)
-        if (self.pevSequenceState==STATE_ATTEN_CHAR_IND_RECEIVED):  # ATTEN_CHAR.IND was received and the
-                                                                    # nearest charger decided and the 
-                                                                    # ATTEN_CHAR.RSP was sent.
-            self.enterState(STATE_DELAY_BEFORE_MATCH)
-            self.pevSequenceDelayCycles = 30 # original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
-            return
-        if (self.pevSequenceState==STATE_DELAY_BEFORE_MATCH): # Waiting time before SLAC_MATCH.REQ
-            if (self.pevSequenceDelayCycles>0):
-                self.pevSequenceDelayCycles-=1
-                return
-            self.composeSlacMatchReq()
-            self.showStatus("SLAC match", "pevState")
-            self.addToTrace("[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...")
-            self.transmit(self.mytransmitbuffer)  
-            self.enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF)
-            return
-        if (self.pevSequenceState==STATE_WAITING_FOR_SLAC_MATCH_CNF):  # waiting for SLAC_MATCH.CNF
-            if (self.isTooLong()):
-                self.enterState(STATE_INITIAL)
-                return
-            self.pevSequenceDelayCycles = 100 # 3s reset wait time (may be a little bit too short, need a retry)
-            # (the normal state transition is done in the receive handler of SLAC_MATCH.CNF,
-            # including the transmission of SET_KEY.REQ)
-            return
-        if (self.pevSequenceState==STATE_WAITING_FOR_RESTART2):  # SLAC is finished, SET_KEY.REQ was 
-                                                                 # transmitted. The homeplug modem makes
-                                                                 # the reset and we need to wait until it
-                                                                 # is up with the new key.
-            if (self.pevSequenceDelayCycles>0):
-                self.pevSequenceDelayCycles-=1
-                return
-            self.addToTrace("[PEVSLAC] Checking whether the pairing worked, by GET_KEY.REQ...")
-            self.numberOfFoundModems = 0 # reset the number, we want to count the modems newly.
-            self.composeGetKey()
-            self.transmit(self.mytransmitbuffer)                
-            self.enterState(STATE_FIND_MODEMS2)
-            return
-        if (self.pevSequenceState==STATE_FIND_MODEMS2): # Waiting for the modems to answer.
-            if (self.pevSequenceCyclesInState>=10):
-                # It was sufficient time to get the answers from the modems.
-                if (self.isSimulationMode!=0):
-                    self.addToTrace("[PEVSLAC] Simulating that both modems are present now.")
-                    self.nEvseModemMissingCounter=0
-                    self.connMgr.ModemFinderOk(2) # Two modems were found.
-                    # This is the end of the SLAC.
-                    # The simulated AVLN is established, we have at least two modems in the network.
-                    self.enterState(STATE_INITIAL)
-                    return
-                self.addToTrace("[PEVSLAC] It was sufficient time to get the answers from the modems.")
-                # Let's see what we received.
-                if (not self.isEvseModemFound()):
-                    self.nEvseModemMissingCounter+=1
-                    self.addToTrace("[PEVSLAC] No EVSE seen (yet). Still waiting for it.")
-                    # At the Alpitronic we measured, that it takes 7s between the SlacMatchResponse and
-                    # the chargers modem reacts to GetKeyRequest. So we should wait here at least 10s.
-                    if (self.nEvseModemMissingCounter>10):
-                            # We lost the connection to the EVSE modem. Back to the beginning.
-                            self.addToTrace("[PEVSLAC] We lost the connection to the EVSE modem. Back to the beginning.")
-                            self.enterState(STATE_INITIAL)
-                            return
-                    # The EVSE modem is (shortly) not seen. Ask again.
-                    self.pevSequenceDelayCycles=30
-                    self.enterState(STATE_WAITING_FOR_RESTART2)
-                    return
-                # The EVSE modem is present
-                self.addToTrace("[PEVSLAC] EVSE is up, pairing successful.")
-                self.nEvseModemMissingCounter=0
-                self.connMgr.ModemFinderOk(2) # Two modems were found.
-                # This is the end of the SLAC.
-                # The AVLN is established, we have at least two modems in the network.
-                self.enterState(STATE_INITIAL)
-
-            return
-        # invalid state is reached. As robustness measure, go to initial state.
-        self.enterState(STATE_INITIAL)
-
-    def runSdpStateMachine(self):
-        if (self.connMgr.getConnectionLevel()<15):
-            # We have no AVLN established and SLAC not ongoing. It does not make sense to start SDP.
-            self.sdp_state = 0
-            return
-        if (self.connMgr.getConnectionLevel()>20):
-            # SDP was already successful. No need to run it again.
-            self.sdp_state = 0
-            return
-        # The ConnectionLevel demands the SDP.
-        if (self.sdp_state==0):
-            # Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-            self.publishStatus("SDP ongoing")
-            self.addToTrace("[SDP] Checkpoint200: Starting SDP.")
-            self.pevSequenceDelayCycles=0
-            self.SdpRepetitionCounter = 50 # prepare the number of retries for the SDP. The more the better.
-            self.sdp_state = 1
-            return
-        if (self.sdp_state == 1): # SDP request transmission and waiting for SDP response.
-            # The normal state transition in case of received SDP response is done in
-            #  the IPv6 receive handler. This will inform the ConnectionManager, and we will stop here
-            #  because of the increased ConnectionLevel.
-            if (self.pevSequenceDelayCycles>0):
-                # just waiting until next action
-                self.pevSequenceDelayCycles-=1
-                return
-            if (self.SdpRepetitionCounter>0):
-                # Reference: The Ioniq waits 4.1s from the slac_match.cnf to the SDP request.
-                # Here we send the SdpRequest. Maybe too early, but we will retry if there is no response.
-                self.ipv6.initiateSdpRequest()
-                self.SdpRepetitionCounter-=1
-                self.pevSequenceDelayCycles = 15 # e.g. half-a-second delay until re-try of the SDP
-                return
-            # All repetitions are over, no SDP response was seen. Back to the beginning.    
-            self.addToTrace("[SDP] ERROR: Did not receive SDP response. Giving up.")
-            self.sdp_state = 0
-    
-        
     def findEthernetAdaptor(self):
-        if (os.name == 'nt'):
-            # On Windows
-            # print("Interfaces:\n" + '\n'.join(pcap.findalldevs()))
-            # For windows, we use a dirty solution here: The pcap uses numbered interfaces like eth0, eth1 etc.,
-            # but the mapping between these numbers and the physical devices is not stable. To find out the
-            # correct interface, we search for its name (e.g. '\Device\NPF_{E4B8176C-8516-4D48-88BC-85225ABCF259}' in
-            # the list of all interfaces.
-            strWindowsInterfaceName = getConfigValue("eth_windows_interface_name")
-            print("The configured windows interface name is " + strWindowsInterfaceName)
-            self.strInterfaceName = "" # default for "not found"
-            for i in range(0, 10):
-                strInterfaceName = pcap.ex_name("eth"+str(i))
-                if (strInterfaceName == strWindowsInterfaceName):
-                    #print("This is the wanted Ethernet adaptor.")
-                    self.strInterfaceName="eth"+str(i)
-                    print("This interface is in pcap " + self.strInterfaceName)
-            if (self.strInterfaceName == ""):
-                print("ERROR: No matching interface was found. Make sure that you configured an existing eth_windows_interface_name in pyPlc.ini.")
-                print("The following interfaces are available:")
-                # print("Interfaces:\n" + '\n'.join(pcap.findalldevs()))
-                for i in range(0, 10):
-                    strInterfaceName = pcap.ex_name("eth"+str(i))
-                    print("eth"+ str(i) + " is " + strInterfaceName)
-
-                sys.exit()
-        else:
-            # On Linux (e.g. Raspberry)
-            # Take the interface name from the ini file. For Linux, this is all we need.
-            self.strInterfaceName=getConfigValue("eth_interface")
-            print("Linux interface is " + self.strInterfaceName)
-            
-    def enterPevMode(self):
-        self.iAmEvse = 0 # not emulating a charging station
-        self.iAmPev = 1 # emulating a vehicle
-        self.ipv6.enterPevMode()
-        self.showStatus("PEV mode", "mode")
-    def enterEvseMode(self):
-        self.iAmEvse = 1 # emulating a charging station
-        self.iAmPev = 0 # not emulating a vehicle
-        self.ipv6.enterEvseMode()
-        self.showStatus("EVSE mode", "mode")
-    def enterListenMode(self):
-        self.iAmEvse = 0 # not emulating a charging station
-        self.iAmPev = 0 # not emulating a vehicle
-        self.ipv6.enterListenMode()
-        self.showStatus("LISTEN mode", "mode")
+        # On Linux (e.g. Raspberry)
+        # Take the interface name from the ini file. For Linux, this is all we need.
+        self.strInterfaceName=getConfigValue("eth_interface")
+        print("Linux interface is " + self.strInterfaceName)
 
     def printToUdp(self, s):
         udplog.udplog_log(s)
 
-    def __init__(self, callbackAddToTrace=None, callbackShowStatus=None, mode=C_LISTEN_MODE, addrMan=None, connMgr=None, isSimulationMode=0):
+    def __init__(self, callbackAddToTrace=None, callbackShowStatus=None, addrMan=None, connMgr=None):
         self.mytransmitbuffer = bytearray("Hallo das ist ein Test", 'UTF-8')
         self.nPacketsReceived = 0
         self.callbackAddToTrace = callbackAddToTrace
@@ -1088,22 +756,6 @@ class pyPlcHomeplug():
         self.numberOfFoundModems = 0
         self.mofi_state = 0
         self.mofi_stateDelay = 0
-        self.isSimulationMode = isSimulationMode # simulation without homeplug modem
-        #self.sniffer = pcap.pcap(name=None, promisc=True, immediate=True, timeout_ms=50)
-        # eth3 means: Third entry from back, in the list of interfaces, which is provided by pcap.findalldevs.
-        #  Improvement necessary: select the interface based on the name.
-        # For debugging of the interface names, we can patch the file
-        # C:\Users\uwemi\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\LocalCache\local-packages\Python310\site-packages\pcap\_pcap_ex.py,
-        # in the function
-        #    def name(name: bytes) -> bytes:
-        # in the place after
-        # if i == idx:
-        #           print("index match at " + str(i) + " dev name=" + str(dev.name) + " dev.description=" + str(dev.description))
-        # This will print the description of the used interface.
-        #
-        # Patch for non-blocking read-iteration:
-        #   in _pcap.py, function def __next__(self), in the case of timeout (if n==0), we need to "raise StopIteration" instead of "continue".
-        #
         self.findEthernetAdaptor()
         self.sniffer = pcap.pcap(name=self.strInterfaceName, promisc=True, immediate=True, timeout_ms=50)
         self.sniffer.setnonblock(True)
@@ -1122,13 +774,6 @@ class pyPlcHomeplug():
         self.ipv6.ownMac = self.myMAC
         udplog.udplog_init(self.transmit, self.addressManager)
         udplog.udplog_log("Test message to verify the syslog. pyPlcHomeplug.py is in the init function.", "initalive")
-        if (mode == C_LISTEN_MODE):
-            self.enterListenMode()
-        if (mode == C_EVSE_MODE):
-            self.enterEvseMode()
-        if (mode == C_PEV_MODE):
-            self.enterPevMode()
-            self.pevMac = self.myMAC
         self.showStatus(prettyMac(self.pevMac), "pevmac")
         print("sniffer created at " + self.strInterfaceName) # we use print, because addToLog does not yet work at this stage in the init.
 
@@ -1138,9 +783,8 @@ class pyPlcHomeplug():
     def showStatus(self, s, selection=""):
         self.callbackShowStatus(s, selection) 
 
-    def receiveCallback(self, timestamp, pkt, *args):
+    def receiveCallback(self, pkt):
         self.nPacketsReceived+=1
-        # print('%d' % (ts)) # the time stamp
         # We received an ethernet package. Determine its type, and dispatch it to the related handler.
         etherType = self.getEtherType(pkt)
         if (etherType == 0x88E1): # it is a HomePlug message
@@ -1156,12 +800,7 @@ class pyPlcHomeplug():
         # Tell the sniffer to give max 100 received packets to the callback function:
         self.sniffer.dispatch(100, self.receiveCallback, None)                
         self.showStatus("nPacketsReceived=" + str(self.nPacketsReceived))
-        if (self.iAmPev==1):
-            self.modemFinder_Mainfunction() # run the modem finder cyclic function
-            self.runPevSequencer() # run the SLAC message sequencer for the PEV side
-            self.runSdpStateMachine() # run the SDP state machine
-        if (self.iAmEvse==1):
-            self.runEvseSlacHandler(); # run the SLAC state machine on EVSE side
+        self.runEvseSlacHandler(); # run the SLAC state machine on EVSE side
         
     def close(self):
         self.sniffer.close()

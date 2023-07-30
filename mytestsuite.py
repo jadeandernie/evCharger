@@ -1,4 +1,3 @@
-
 # For testing.
 #
 # Concept: This module allows to trigger abnormal situations, to test the reaction of the software ("fault insertion testing").
@@ -14,7 +13,6 @@
 
 from udplog import udplog_log
 from configmodule import getConfigValue, getConfigValueBool
-
 
 # The list of test cases. Each must have a unique test case ID.
 TC_NOTHING_TO_TEST = 0

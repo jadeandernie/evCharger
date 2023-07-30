@@ -1,8 +1,4 @@
-
-
-
 # Connection Manager
-
 # This module is informed by the several state machines in case of good connection.
 #   It calculates an overall ConnectionLevel.
 #   This ConnectionLevel is provided to the state machines, so that each state machine
@@ -13,7 +9,7 @@
 #   the lower-layer state machine can stay silent as long as the upper layers are working
 #   fine.
 
-from configmodule import getConfigValue, getConfigValueBool
+from configmodule import getConfigValueBool
 import sys # For exit_on_session_end hack
 
 CONNLEVEL_100_APPL_RUNNING = 100
@@ -46,8 +42,7 @@ class connMgr():
                      + " --> " + str(self.ConnectionLevel)
         self.addToTrace(s)
 
-
-    def __init__(self, callbackAddToTrace, callbackShowStatus):
+    def __init__(self, callbackAddToTrace):
         self.timerEthLink = 0
         self.timerModemLocal = 0
         self.timerModemRemote = 0

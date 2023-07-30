@@ -35,7 +35,6 @@ directory = 'local/pcaps_to_convert'
 # stop the evaluation after this number of packets. Set to zero to have no limit.
 nLimitNumberOfPackets = -1
 
-
 def getManufacturerFromMAC(strMAC):
     # Examples based on https://macvendors.com/, and https://www.ipchecktool.com/tool/macfinder and own experience
     if (strMAC[0:5]=="ec:a2"):
@@ -89,9 +88,7 @@ def convertPcapToTxt(inputFileName):
     numberOfPackets=0
     for packet in cap:
         numberOfPackets+=1
-        #print(packet)
         if 'TCP' in packet:
-            #print(packet.tcp.field_names)
             if ('payload' in packet.tcp.field_names):
                 tcppayload = packet.tcp.payload # this gives a string of hex values, separated by ":", e.g. "01:fe:80:01"
                 s = tcppayload.replace(":", "") # remove colons
@@ -101,8 +98,6 @@ def convertPcapToTxt(inputFileName):
                     sHeader = "Packet #" + str(numberOfPackets) + " [" + str(packet.sniff_time) + "] " + strExi + " means:"
                     pre = "DD" # decode DIN
                     decoded=exiConnector.exiDecode(strExi, pre)
-                    #print(sHeader)
-                    #print(decoded)
                     print(sHeader, file=fileOut)
                     print(decoded, file=fileOut)
                     if (decoded.find("SessionSetupReq")>0):
@@ -152,10 +147,6 @@ def convertPcapToTxt(inputFileName):
             print(str(numberOfPackets) + " packets")
         if ((nLimitNumberOfPackets>0) and (numberOfPackets>=nLimitNumberOfPackets)):
             break
-    # Statistics of the timing:
-    #print("t1CableCheckBegin " + str(t1CableCheckBegin))
-    #print("t2PreChargeBegin " + str(t2PreChargeBegin))
-    #print("t3CurrentDemandBegin " + str(t3CurrentDemandBegin))
     if ((t1CableCheckBegin>0) and (t2PreChargeBegin>t1CableCheckBegin) and (t3CurrentDemandBegin>t2PreChargeBegin)):
         print("charger MAC " + chargerMAC + " " + getManufacturerFromMAC(chargerMAC))
         timeForCableCheck = t2PreChargeBegin - t1CableCheckBegin
